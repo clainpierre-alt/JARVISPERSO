@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JARVIS Auto</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body { background-color: #050505; color: #00ffcc; font-family: monospace; display: flex; flex-direction: column; height: 100vh; margin: 0; justify-content: center; align-items: center; }
+        .hud-box { border: 2px solid #00ffcc; padding: 20px; border-radius: 10px; width: 80%; text-align: center; box-shadow: 0 0 15px rgba(0,255,204,0.3); }
+        button { background: #00ffcc; color: #000; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; }
+        #response { margin-top: 20px; font-size: 1.2em; min-height: 50px; }
+    </style>
+</head>
+<body>
+
+    <div class="hud-box">
+        <h2>J.A.R.V.I.S. INTERFACE</h2>
+        <p id="status">Système en attente...</p>
+        <button onclick="startListening()">Parler à J.A.R.V.I.S.</button>
+        <div id="response">...</div>
+    </div>
+
+    <script>
+        const BACKEND_URL = "https://ton-app-railway.up.railway.app"; // Remplace par ton URL Railway
+
+        // Utilisation de l'API de reconnaissance vocale native du navigateur mobile (SpeechRecognition)
+        function startListening() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("La reconnaissance vocale n'est pas supportée par ce navigateur.");
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'fr-FR';
+            recognition.interimResults = false;
+
+            document.getElementById("status").innerText = "Écoute en cours...";
+
+            recognition.onresult = async function(event) {
+                const speechText = event.results[0][0].transcript;
+                document.getElementById("status").innerText = `Vous: "${speechText}"`;
+                
+                // Envoi au backend Railway
+                sendToBackend(speechText);
+            };
+
+            recognition.onerror = function() {
+                document.getElementById("status").innerText = "Erreur d'écoute.";
+            };
+
+            recognition.start();
+        }
+
+        async function sendToBackend(text) {
+            try {
+                const response = await fetch(`${BACKEND_URL}/api/interaction`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: "pierre_admin",
+                        text_input: text,
+                        location: "Salon-de-Provence"
+                    })
+                });
+                const data = await response.json();
+                document.getElementById("response").innerText = data.reply;
+                
+                // Lecture audio de la réponse par le téléphone (TTS natif)
+                speak(data.reply);
+            } catch (err) {
+                document.getElementById("response").innerText = "Erreur de connexion au serveur.";
+            }
+        }
+
+        function speak(text) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'fr-FR';
+            utterance.rate = 1.0;
+            window.speechSynthesis.speak(utterance);
+        }
+    </script>
+</body>
+</html>
