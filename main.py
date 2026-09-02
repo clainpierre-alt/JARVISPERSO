@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from google import genai
 from supabase import create_client, Client
 
-app = FastAPI(title="JARVIS Car Assistant - Holographic HUD")
+app = FastAPI(title="J.A.R.V.I.S. // Full Autonomous HUD")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +29,7 @@ class UserInteraction(BaseModel):
     text_input: str
     location: str = "Inconnu"
 
-# Page d'accueil HUD Holographique intégrée
+# Interface HUD Holographique avec Géolocalisation Temps Réel et Écoute Continue
 @app.get("/", response_class=HTMLResponse)
 async def serve_hud():
     return """
@@ -81,7 +81,6 @@ async def serve_hud():
                 position: relative;
             }
 
-            /* Coins sciés/technologiques du cadre */
             .hud-frame::before, .hud-frame::after {
                 content: '';
                 position: absolute;
@@ -89,7 +88,6 @@ async def serve_hud():
                 height: 15px;
                 border-color: var(--primary);
                 border-style: solid;
-                transition: all 0.5s ease;
             }
             .hud-frame::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
             .hud-frame::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
@@ -167,7 +165,6 @@ async def serve_hud():
                 background: rgba(0, 0, 0, 0.3);
                 text-align: left;
                 border-radius: 0 8px 8px 0;
-                box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
             }
 
             .btn-tactical {
@@ -180,19 +177,17 @@ async def serve_hud():
                 font-weight: bold;
                 border-radius: 8px;
                 cursor: pointer;
-                transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                transition: all 0.3s ease;
                 margin-top: 10px;
                 letter-spacing: 2px;
                 width: 100%;
                 text-transform: uppercase;
-                box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
             }
 
             .btn-tactical:hover {
                 background: var(--primary);
                 color: var(--bg-deep);
                 box-shadow: 0 0 25px var(--primary);
-                transform: translateY(-2px);
             }
 
             .active-pulse {
@@ -214,26 +209,41 @@ async def serve_hud():
             <h1>J.A.R.V.I.S.</h1>
             <div class="subtitle">Autonomous Vehicular Intelligence</div>
             
-            <div id="status">Système en attente d'initialisation...</div>
+            <div id="status">Système en veille - Prêt</div>
             
             <button class="btn-tactical" id="startBtn" onclick="initJarvis()">ACTIVER LA LIAISON</button>
             
-            <div class="terminal-output" id="response">En attente de paramètres de vol...</div>
+            <div class="terminal-output" id="response">En attente de paramètres...</div>
         </div>
 
         <script>
             let recognition;
             let isListening = false;
+            let currentCoords = "Salon-de-Provence";
+
+            // Récupération dynamique du GPS du téléphone/voiture en arrière-plan
+            function trackLocation() {
+                if (navigator.geolocation) {
+                    navigator.geolocation.watchPosition(
+                        (position) => {
+                            currentCoords = `${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`;
+                        },
+                        (error) => { console.warn("GPS non dispo, mode par défaut."); },
+                        { enableHighAccuracy: true }
+                    );
+                }
+            }
 
             function initJarvis() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (!SpeechRecognition) {
-                    alert("Module vocal non compatible avec ce navigateur.");
+                    alert("Module vocal non compatible.");
                     return;
                 }
 
+                trackLocation();
                 document.getElementById("startBtn").style.display = "none";
-                document.getElementById("status").innerText = "Écoute continue active (Mode Mains Libres)";
+                document.getElementById("status").innerText = "Écoute continue active (Mains Libres)";
                 document.getElementById("hudFrame").classList.add("active-pulse");
 
                 recognition = new SpeechRecognition();
@@ -247,30 +257,18 @@ async def serve_hud():
                     await sendToBackend(speechText);
                 };
 
-                recognition.onerror = function(event) {
-                    console.warn("Alerte micro:", event.error);
-                };
-
                 recognition.onend = function() {
                     if (isListening) {
-                        try {
-                            recognition.start();
-                        } catch (e) {
-                            console.log("Relance micro en cours...");
-                        }
+                        try { recognition.start(); } catch (e) {}
                     }
                 };
 
                 isListening = true;
-                try {
-                    recognition.start();
-                } catch(e) {
-                    console.error(e);
-                }
+                try { recognition.start(); } catch(e) {}
             }
 
             async function sendToBackend(text) {
-                document.getElementById("response").innerText = "Traitement neural en cours...";
+                document.getElementById("response").innerText = "Analyse neurale & mémoire...";
                 try {
                     const response = await fetch('/api/interaction', {
                         method: 'POST',
@@ -278,7 +276,7 @@ async def serve_hud():
                         body: JSON.stringify({ 
                             user_id: "pierre_admin", 
                             text_input: text, 
-                            location: "Salon-de-Provence" 
+                            location: currentCoords 
                         })
                     });
                     
@@ -288,7 +286,7 @@ async def serve_hud():
                     document.getElementById("response").innerText = data.reply;
                     speak(data.reply);
                 } catch (err) {
-                    document.getElementById("response").innerText = "ALERTE : Perte de liaison avec le serveur.";
+                    document.getElementById("response").innerText = "ALERTE : Perte de liaison serveur.";
                 }
             }
 
@@ -300,7 +298,7 @@ async def serve_hud():
                 utterance.rate = 1.05;
                 
                 utterance.onend = () => {
-                    document.getElementById("status").innerText = "Écoute continue active (Mode Mains Libres)";
+                    document.getElementById("status").innerText = "Écoute continue active (Mains Libres)";
                 };
 
                 window.speechSynthesis.speak(utterance);
@@ -315,14 +313,39 @@ async def handle_interaction(data: UserInteraction):
     if not client_ai:
         raise HTTPException(status_code=500, detail="Gemini API Key non configurée")
 
-    system_instruction = (
-        "Tu es J.A.R.V.I.S., un assistant embarqué hautement intelligent, concis et factuel. "
-        "Tu t'adresses à Pierre. Tes réponses doivent impérativement faire moins de 20 mots, "
-        "être formulées de manière directe, et être adaptées à un contexte de conduite automobile."
-    )
-    
     try:
-        # Utilisation de la session de chat recommandée par le SDK Google GenAI
+        # 1. Génération de l'embedding de la requête utilisateur (pour la mémoire RAG)
+        embedding_response = client_ai.models.embed_content(
+            model="text-embedding-004",
+            contents=data.text_input
+        )
+        query_embedding = embedding_response.embedding.values
+
+        # 2. Recherche des souvenirs passés similaires dans Supabase via pgvector
+        context_memories = ""
+        if supabase:
+            try:
+                rpc_result = supabase.rpc("match_interactions", {
+                    "query_embedding": query_embedding,
+                    "match_threshold": 0.70,
+                    "match_count": 3
+                }).execute()
+                
+                if rpc_result.data:
+                    memories_list = [f"- Ancien échange : User: '{row['input_text']}' -> Toi: '{row['output_text']}'" for row in rpc_result.data]
+                    context_memories = "\n".join(memories_list)
+            except Exception as vector_err:
+                print(f"Info recherche vectorielle : {vector_err}")
+
+        # 3. Instruction système enrichie avec la mémoire long-terme
+        system_instruction = (
+            "Tu es J.A.R.V.I.S., un assistant embarqué hautement intelligent, concis et factuel. "
+            "Tu t'adresses à Pierre. Tes réponses doivent impérativement faire moins de 20 mots, "
+            "être formulées de manière directe, et être adaptées à un contexte de conduite automobile.\n\n"
+            f"Contexte mémoriel pertinent issu des interactions passées de Pierre :\n{context_memories if context_memories else 'Aucun souvenir direct similaire.'}"
+        )
+
+        # 4. Génération de la réponse via le modèle Gemini
         chat = client_ai.chats.create(
             model='gemini-2.5-flash',
             config={
@@ -331,13 +354,13 @@ async def handle_interaction(data: UserInteraction):
             }
         )
         
-        response = chat.send_message(f"[Lieu: {data.location}] {data.text_input}")
+        response = chat.send_message(f"[Coordonnées GPS/Lieu: {data.location}] {data.text_input}")
         reply = response.text if response and response.text else "Je n'ai pas de réponse."
 
-        # Scoring automatique de la concision
+        # 5. Scoring automatique de la concision
         score = 5 if len(reply.split()) <= 25 else 3
 
-        # Sauvegarde Supabase
+        # 6. Sauvegarde de l'interaction et de son embedding dans Supabase
         if supabase:
             try:
                 supabase.table("interactions_log").insert({
@@ -345,13 +368,14 @@ async def handle_interaction(data: UserInteraction):
                     "input_text": data.text_input,
                     "output_text": reply,
                     "location": data.location,
-                    "score": score
+                    "score": score,
+                    "embedding": query_embedding
                 }).execute()
             except Exception as db_err:
-                print(f"Erreur insertion Supabase : {db_err}")
+                print(f"Erreur insertion Supabase avec embedding : {db_err}")
 
         return {"status": "success", "reply": reply, "auto_score": score}
         
     except Exception as e:
-        print(f"Erreur critique chat Gemini : {str(e)}")
+        print(f"Erreur critique backend : {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
