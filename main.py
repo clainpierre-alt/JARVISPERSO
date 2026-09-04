@@ -3,8 +3,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google import genai
-from supabase import create_client, Client
+from openai import OpenAI
+from mem0 import MemoryClient
 
 app = FastAPI(title="J.A.R.V.I.S. // Full Autonomous HUD")
 
@@ -16,22 +16,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialisation
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+# Configuration OpenCode & Mem0
+OPENCODE_API_KEY = os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY")
+MEM0_API_KEY = os.getenv("MEM0_API_KEY")
 
-client_ai = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+# Clients API
+client_ai = OpenAI(
+    api_key=OPENCODE_API_KEY,
+    base_url="https://api.opencode.ai/v1" 
+) if OPENCODE_API_KEY else None
+
+memory_client = MemoryClient(api_key=MEM0_API_KEY) if MEM0_API_KEY else None
 
 class UserInteraction(BaseModel):
     user_id: str
     text_input: str
     location: str = "Inconnu"
 
-# Interface HUD Holographique avec Géolocalisation Temps Réel et Écoute Continue
 @app.get("/", response_class=HTMLResponse)
 async def serve_hud():
+    # Le frontend HUD holographique reste strictement identique
     return """
     <!DOCTYPE html>
     <html lang="fr">
@@ -47,7 +51,6 @@ async def serve_hud():
                 --glass: rgba(0, 240, 255, 0.03);
                 --border-glow: rgba(0, 240, 255, 0.2);
             }
-
             body {
                 background-color: var(--bg-deep);
                 background-image: 
@@ -67,7 +70,6 @@ async def serve_hud():
                 padding: 15px;
                 overflow: hidden;
             }
-
             .hud-frame {
                 border: 1px solid var(--border-glow);
                 background: var(--glass);
@@ -80,7 +82,6 @@ async def serve_hud():
                 box-shadow: 0 0 40px rgba(0, 240, 255, 0.1), inset 0 0 20px rgba(0, 240, 255, 0.05);
                 position: relative;
             }
-
             .hud-frame::before, .hud-frame::after {
                 content: '';
                 position: absolute;
@@ -91,7 +92,6 @@ async def serve_hud():
             }
             .hud-frame::before { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
             .hud-frame::after { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
-
             .reactor-core {
                 width: 90px;
                 height: 90px;
@@ -101,18 +101,15 @@ async def serve_hud():
                 align-items: center;
                 justify-content: center;
             }
-
             .ring {
                 position: absolute;
                 border-radius: 50%;
                 border: 2px dashed rgba(0, 240, 255, 0.4);
                 animation: spin 10s linear infinite;
             }
-
             .ring:nth-child(1) { width: 90px; height: 90px; border-color: var(--primary); border-width: 1px; border-style: solid; opacity: 0.3; }
             .ring:nth-child(2) { width: 70px; height: 70px; border-color: var(--secondary); animation-direction: reverse; animation-duration: 6s; }
             .ring:nth-child(3) { width: 50px; height: 50px; border-color: var(--primary); animation-duration: 4s; }
-
             .core-center {
                 width: 20px;
                 height: 20px;
@@ -121,13 +118,11 @@ async def serve_hud():
                 box-shadow: 0 0 20px var(--primary), 0 0 40px var(--secondary);
                 animation: pulse-core 2s ease-in-out infinite;
             }
-
             @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             @keyframes pulse-core {
                 0%, 100% { transform: scale(0.8); opacity: 0.7; }
                 50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 30px var(--primary), 0 0 60px var(--secondary); }
             }
-
             h1 {
                 letter-spacing: 5px;
                 margin: 0 0 5px 0;
@@ -135,7 +130,6 @@ async def serve_hud():
                 color: #ffffff;
                 text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);
             }
-
             .subtitle {
                 font-size: 0.75rem;
                 letter-spacing: 2px;
@@ -143,7 +137,6 @@ async def serve_hud():
                 margin-bottom: 20px;
                 text-transform: uppercase;
             }
-
             #status {
                 font-size: 0.85rem;
                 color: #94a3b8;
@@ -151,7 +144,6 @@ async def serve_hud():
                 min-height: 20px;
                 letter-spacing: 1px;
             }
-
             .terminal-output {
                 margin-top: 15px;
                 font-size: 1.05rem;
@@ -166,7 +158,6 @@ async def serve_hud():
                 text-align: left;
                 border-radius: 0 8px 8px 0;
             }
-
             .btn-tactical {
                 background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(112, 0, 255, 0.1));
                 color: var(--primary);
@@ -183,13 +174,11 @@ async def serve_hud():
                 width: 100%;
                 text-transform: uppercase;
             }
-
             .btn-tactical:hover {
                 background: var(--primary);
                 color: var(--bg-deep);
                 box-shadow: 0 0 25px var(--primary);
             }
-
             .active-pulse {
                 border-color: var(--primary) !important;
                 box-shadow: 0 0 30px rgba(0, 240, 255, 0.4) !important;
@@ -205,14 +194,10 @@ async def serve_hud():
                 <div class="ring"></div>
                 <div class="core-center"></div>
             </div>
-            
             <h1>J.A.R.V.I.S.</h1>
             <div class="subtitle">Autonomous Vehicular Intelligence</div>
-            
             <div id="status">Système en veille - Prêt</div>
-            
             <button class="btn-tactical" id="startBtn" onclick="initJarvis()">ACTIVER LA LIAISON</button>
-            
             <div class="terminal-output" id="response">En attente de paramètres...</div>
         </div>
 
@@ -221,7 +206,6 @@ async def serve_hud():
             let isListening = false;
             let currentCoords = "Salon-de-Provence";
 
-            // Récupération dynamique du GPS du téléphone/voiture en arrière-plan
             function trackLocation() {
                 if (navigator.geolocation) {
                     navigator.geolocation.watchPosition(
@@ -268,7 +252,7 @@ async def serve_hud():
             }
 
             async function sendToBackend(text) {
-                document.getElementById("response").innerText = "Analyse neurale & mémoire...";
+                document.getElementById("response").innerText = "Analyse neurale & mémoire Mem0...";
                 try {
                     const response = await fetch('/api/interaction', {
                         method: 'POST',
@@ -311,68 +295,65 @@ async def serve_hud():
 @app.post("/api/interaction")
 async def handle_interaction(data: UserInteraction):
     if not client_ai:
-        raise HTTPException(status_code=500, detail="Gemini API Key non configurée")
+        raise HTTPException(status_code=500, detail="OpenCode API Key non configurée")
+    
+    if not memory_client:
+        print("Avertissement: Mem0 API Key non configurée, la mémoire est désactivée.")
 
     try:
-        # 1. Génération de l'embedding de la requête utilisateur (pour la mémoire RAG)
-        embedding_response = client_ai.models.embed_content(
-            model="text-embedding-004",
-            contents=data.text_input
-        )
-        query_embedding = embedding_response.embedding.values
-
-        # 2. Recherche des souvenirs passés similaires dans Supabase via pgvector
+        # 1. Recherche des souvenirs dans Mem0
         context_memories = ""
-        if supabase:
+        if memory_client:
             try:
-                rpc_result = supabase.rpc("match_interactions", {
-                    "query_embedding": query_embedding,
-                    "match_threshold": 0.70,
-                    "match_count": 3
-                }).execute()
-                
-                if rpc_result.data:
-                    memories_list = [f"- Ancien échange : User: '{row['input_text']}' -> Toi: '{row['output_text']}'" for row in rpc_result.data]
+                search_results = memory_client.search(
+                    query=data.text_input, 
+                    user_id=data.user_id, 
+                    limit=3
+                )
+                if search_results:
+                    # Mem0 renvoie directement les faits pertinents extraits
+                    memories_list = [f"- {res['memory']}" for res in search_results]
                     context_memories = "\n".join(memories_list)
-            except Exception as vector_err:
-                print(f"Info recherche vectorielle : {vector_err}")
+            except Exception as mem_err:
+                print(f"Info recherche Mem0 : {mem_err}")
 
-        # 3. Instruction système enrichie avec la mémoire long-terme
+        # 2. Instruction système
         system_instruction = (
             "Tu es J.A.R.V.I.S., un assistant embarqué hautement intelligent, concis et factuel. "
             "Tu t'adresses à Pierre. Tes réponses doivent impérativement faire moins de 20 mots, "
             "être formulées de manière directe, et être adaptées à un contexte de conduite automobile.\n\n"
-            f"Contexte mémoriel pertinent issu des interactions passées de Pierre :\n{context_memories if context_memories else 'Aucun souvenir direct similaire.'}"
+            f"Faits et souvenirs pertinents sur Pierre :\n{context_memories if context_memories else 'Aucun souvenir.'}"
         )
 
-        # 4. Génération de la réponse via le modèle Gemini
-        chat = client_ai.chats.create(
-            model='gemini-2.5-flash',
-            config={
-                'system_instruction': system_instruction,
-                'max_output_tokens': 40
-            }
+        # 3. Génération de texte via OpenCode (ex: GPT 5.4 Nano)
+        completion = client_ai.chat.completions.create(
+            model="GPT 5.4 Nano", 
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": f"[Lieu: {data.location}] {data.text_input}"}
+            ],
+            max_tokens=60,
+            temperature=0.3
         )
         
-        response = chat.send_message(f"[Coordonnées GPS/Lieu: {data.location}] {data.text_input}")
-        reply = response.text if response and response.text else "Je n'ai pas de réponse."
+        reply = completion.choices[0].message.content.strip() if completion.choices else "Je n'ai pas de réponse."
 
-        # 5. Scoring automatique de la concision
-        score = 5 if len(reply.split()) <= 25 else 3
-
-        # 6. Sauvegarde de l'interaction et de son embedding dans Supabase
-        if supabase:
+        # 4. Sauvegarde intelligente dans Mem0
+        if memory_client:
             try:
-                supabase.table("interactions_log").insert({
-                    "user_id": data.user_id,
-                    "input_text": data.text_input,
-                    "output_text": reply,
-                    "location": data.location,
-                    "score": score,
-                    "embedding": query_embedding
-                }).execute()
-            except Exception as db_err:
-                print(f"Erreur insertion Supabase avec embedding : {db_err}")
+                # Mem0 extrait automatiquement l'information utile (ex: "Pierre aime le café") de cette chaîne
+                memory_client.add(
+                    messages=[
+                        {"role": "user", "content": data.text_input},
+                        {"role": "assistant", "content": reply}
+                    ],
+                    user_id=data.user_id
+                )
+            except Exception as mem_err:
+                print(f"Erreur ajout Mem0 : {mem_err}")
+
+        # Score calculé en local
+        score = 5 if len(reply.split()) <= 25 else 3
 
         return {"status": "success", "reply": reply, "auto_score": score}
         
