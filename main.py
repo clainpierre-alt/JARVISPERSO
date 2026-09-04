@@ -33,7 +33,7 @@ PRIMARY_MODEL = os.getenv("AI_MODEL_NAME", "gemini-3.5-flash-lite")
 FALLBACK_MODEL = f"opencode/{PRIMARY_MODEL}" if not PRIMARY_MODEL.startswith("opencode/") else PRIMARY_MODEL
 
 client_ai = OpenAI(api_key=OPENCODE_API_KEY, base_url="https://api.opencode.ai/v1") if OPENCODE_API_KEY else None
-memory_client = MemoryClient(api_key=MEM0_API_KEY) if MEM0_API_KEY else None
+memory_client =  None
 
 class UserInteraction(BaseModel):
     user_id: str
