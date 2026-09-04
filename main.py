@@ -3,7 +3,7 @@ import logging
 import jwt
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, HTTPException, Header, Request, Depends
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import openai
@@ -20,16 +20,16 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="ONYX // Secure HUD")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 OPENCODE_API_KEY = os.getenv("OPENCODE_API_KEY") or os.getenv("OPENAI_API_KEY")
 MEM0_API_KEY = os.getenv("MEM0_API_KEY")
-ACCESS_CODE = os.getenv("ACCESS_CODE", "0000")
+ACCESS_CODE = os.getenv("ACCESS_CODE", "7030")
 JWT_SECRET = os.getenv("JWT_SECRET", "onyx_default_secure_key_2026")
 JWT_ALGORITHM = "HS256"
-# Assurez-vous du nom exact du modèle chez votre fournisseur
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gpt-4o-mini") 
+
+# Remplacer par l'identifiant technique strict (ex: gpt-5.4-nano)
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-3.5-flash-lite") 
 
 client_ai = OpenAI(api_key=OPENCODE_API_KEY, base_url="https://api.opencode.ai/v1") if OPENCODE_API_KEY else None
 memory_client = MemoryClient(api_key=MEM0_API_KEY) if MEM0_API_KEY else None
@@ -53,9 +53,32 @@ async def verify_token(authorization: str = Header(None)):
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Jeton invalide")
 
-@app.get("/manifest.json", response_class=FileResponse)
+# GÉNÉRATION DYNAMIQUE DU MANIFESTE PWA
+@app.get("/manifest.json")
 async def serve_manifest():
-    return FileResponse("manifest.json", media_type="application/manifest+json")
+    return JSONResponse(content={
+        "name": "Onyx Neural Assistant",
+        "short_name": "Onyx",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#02040a",
+        "theme_color": "#02040a",
+        "icons": [{
+            "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iIzAwZjBmZiIvPjwvc3ZnPg==",
+            "sizes": "512x512",
+            "type": "image/svg+xml"
+        }]
+    })
+
+# SERVICE WORKER OBLIGATOIRE POUR INSTALLATION MOBILE
+@app.get("/sw.js")
+async def serve_sw():
+    sw_content = """
+    self.addEventListener('install', (e) => { self.skipWaiting(); });
+    self.addEventListener('activate', (e) => { e.waitUntil(clients.claim()); });
+    self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request)); });
+    """
+    return Response(content=sw_content, media_type="application/javascript")
 
 @app.post("/api/auth")
 @limiter.limit("5/minute")
@@ -124,7 +147,6 @@ async def serve_hud():
             .btn-tactical { background: linear-gradient(135deg, rgba(0, 240, 255, 0.1), rgba(112, 0, 255, 0.1)); color: var(--primary); border: 1px solid var(--primary); padding: 16px 32px; font-size: 1rem; font-family: inherit; font-weight: bold; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; margin-top: 15px; letter-spacing: 3px; width: 100%; text-transform: uppercase; }
             .btn-tactical:hover, .btn-tactical:active { background: var(--primary); color: var(--bg-deep); box-shadow: 0 0 30px var(--primary); }
         </style>
-        <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
     </head>
     <body>
         <div class="hud-frame" id="lockScreen">
@@ -147,6 +169,13 @@ async def serve_hud():
         </div>
 
         <script>
+            // ENREGISTREMENT DU SERVICE WORKER POUR PWA
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW ERREUR', err));
+                });
+            }
+
             let recognition;
             let isListening = false;
             let isProcessing = false;
@@ -156,7 +185,6 @@ async def serve_hud():
 
             window.speechSynthesis.onvoiceschanged = () => { availableVoices = window.speechSynthesis.getVoices(); };
 
-            // Générateur de Bips "Sci-Fi"
             function playBeep(freq, type, duration, vol=0.05) {
                 try {
                     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -174,7 +202,7 @@ async def serve_hud():
 
             function setHUDState(state, text) {
                 const hud = document.getElementById("hudFrame");
-                hud.className = "hud-frame"; // Reset
+                hud.className = "hud-frame";
                 if (state) hud.classList.add(`state-${state}`);
                 if (text) document.getElementById("status").innerText = text;
             }
@@ -193,7 +221,7 @@ async def serve_hud():
                         jwtToken = data.access_token; 
                         document.getElementById('lockScreen').style.display = 'none';
                         document.getElementById('hudFrame').style.display = 'block';
-                        playBeep(880, 'sine', 200, 0.1); // Bip d'allumage
+                        playBeep(880, 'sine', 200, 0.1);
                     } else {
                         document.getElementById('authError').innerText = "CODE REJETÉ";
                         document.getElementById('pinInput').value = "";
@@ -271,7 +299,7 @@ async def serve_hud():
                     
                     if (!response.ok) {
                         document.getElementById("response").innerText = data.reply || "Erreur système.";
-                        speak(data.reply || "Erreur de connexion.");
+                        speak(data.reply || "Erreur de connexion avec le modèle.");
                     } else {
                         document.getElementById("response").innerText = data.reply;
                         speak(data.reply);
@@ -298,7 +326,6 @@ async def serve_hud():
                 }
 
                 setHUDState('', "Onyx parle...");
-                
                 utterance.onend = () => { restartListening(); };
                 utterance.onerror = () => { restartListening(); };
                 
@@ -361,8 +388,8 @@ async def handle_interaction(data: UserInteraction, token_data: dict = Depends(v
         return {"status": "success", "reply": reply}
         
     except openai.NotFoundError:
-        logger.error(f"Erreur 404: Modèle {AI_MODEL_NAME} introuvable.")
-        return JSONResponse(status_code=404, content={"status": "error", "reply": "Modèle d'intelligence artificielle introuvable. Vérifiez votre configuration serveur."})
+        logger.error(f"Erreur 404: Modèle '{AI_MODEL_NAME}' introuvable ou URL incorrecte.")
+        return JSONResponse(status_code=404, content={"status": "error", "reply": f"Erreur de configuration. Le modèle {AI_MODEL_NAME} est introuvable."})
     except Exception as e:
         logger.error(f"Erreur backend : {str(e)}", exc_info=True)
         return JSONResponse(status_code=500, content={"status": "error", "reply": "Défaillance des systèmes de traitement."})
