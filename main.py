@@ -11,11 +11,10 @@ from mem0 import MemoryClient
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s", handlers=[logging.StreamHandler()])
 logger = logging.getLogger("ONYX_CORE")
 
-limiter = Limiter(key_func=get_remote_address)
+limiter =f Limiter(key_func=get_remote_address)
 app = FastAPI(title="ONYX // Direct HTTP HUD")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -27,8 +26,8 @@ ACCESS_CODE = os.getenv("ACCESS_CODE", "0000")
 JWT_SECRET = os.getenv("JWT_SECRET", "onyx_secure_key_2026")
 JWT_ALGORITHM = "HS256"
 
-# Modèle cible OpenCode
-TARGET_MODEL = os.getenv("AI_MODEL_NAME", "gemini-3.5-flash-lite")
+# Correction :
+TARGET_MODEL = os.getenv("AI_MODEL_NAME", "opencode/gemini-3.5-flash-lite")
 
 memory_client = MemoryClient(api_key=MEM0_API_KEY) if MEM0_API_KEY else None
 
