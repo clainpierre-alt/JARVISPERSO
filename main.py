@@ -29,7 +29,7 @@ JWT_SECRET = os.getenv("JWT_SECRET", "onyx_default_secure_key_2026")
 JWT_ALGORITHM = "HS256"
 
 # Remplacer par l'identifiant technique strict (ex: gpt-5.4-nano)
-AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "gemini-3.5-flash-lite") 
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "google/gemini-3.5-flash-lite") 
 
 client_ai = OpenAI(api_key=OPENCODE_API_KEY, base_url="https://api.opencode.ai/v1") if OPENCODE_API_KEY else None
 memory_client = MemoryClient(api_key=MEM0_API_KEY) if MEM0_API_KEY else None
