@@ -1,5 +1,5 @@
 fastapi
 uvicorn
-google-genai
-supabase
+openai>=1.0.0
+mem0ai
 pydantic
