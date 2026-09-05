@@ -27,7 +27,7 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, 
 OPENCODE_API_KEY = os.getenv("OPENCODE_API_KEY")
 MEM0_API_KEY = os.getenv("MEM0_API_KEY")
 ACCESS_CODE = os.getenv("ACCESS_CODE", "0000")
-JWT_SECRET = os.getenv("JWT_SECRET", "onyx_super_secure_jwt_secret_key_2026_c4")
+JWT_SECRET = os.getenv("JWT_SECRET", "onyx_super_secure_jwt_secret_key_2026_c4_vehicle_assistant")
 JWT_ALGORITHM = "HS256"
 
 AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "opencode/gemini-3.5-flash-lite")
@@ -57,7 +57,11 @@ async def call_opencode_api(system_prompt: str, user_prompt: str) -> str:
     if not OPENCODE_API_KEY:
         raise HTTPException(status_code=500, detail="OPENCODE_API_KEY non configurée")
 
-    url = "https://api.opencode.ai/v1/chat/completions"
+    endpoints = [
+        "https://opencode.ai/zen/v1/chat/completions",
+        "https://api.opencode.ai/v1/chat/completions"
+    ]
+    
     headers = {
         "Authorization": f"Bearer {OPENCODE_API_KEY}",
         "Content-Type": "application/json"
@@ -74,19 +78,28 @@ async def call_opencode_api(system_prompt: str, user_prompt: str) -> str:
     }
 
     async with httpx.AsyncClient(timeout=12.0) as client:
-        try:
-            res = await client.post(url, headers=headers, json=payload)
-            if res.status_code == 200:
-                data = res.json()
-                if "choices" in data and len(data["choices"]) > 0:
-                    return data["choices"][0]["message"]["content"].strip()
-                elif isinstance(data, str):
-                    return data.strip()
-            logger.error(f"Erreur API OpenCode ({res.status_code}) : {res.text}")
-        except Exception as err:
-            logger.error(f"Erreur réseau OpenCode : {err}")
+        for url in endpoints:
+            try:
+                logger.info(f"Appel OpenCode sur {url} avec le modèle {AI_MODEL_NAME}")
+                res = await client.post(url, headers=headers, json=payload)
+                
+                # Vérification que la réponse n'est pas vide avant parsing JSON
+                if res.status_code == 200 and res.text and res.text.strip():
+                    try:
+                        data = res.json()
+                        if isinstance(data, dict) and "choices" in data and len(data["choices"]) > 0:
+                            return data["choices"][0]["message"]["content"].strip()
+                        elif isinstance(data, str):
+                            return data.strip()
+                    except Exception as parse_err:
+                        logger.warning(f"Impossible de parser la réponse JSON de {url}: {parse_err}")
+                        continue
+                else:
+                    logger.warning(f"Réponse vide ou invalide de {url} (Status HTTP: {res.status_code})")
+            except Exception as err:
+                logger.error(f"Erreur de connexion avec l'endpoint {url} : {err}")
 
-    raise HTTPException(status_code=502, detail="Impossible d'obtenir une réponse de l'API AI.")
+    raise HTTPException(status_code=502, detail="Aucune réponse exploitable de l'API OpenCode.")
 
 @app.get("/manifest.json")
 async def serve_manifest():
