@@ -1,4 +1,5 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "model": "opencode/gemini-3.5-flash-lite",
   "small_model": "opencode/gemini-3.5-flash-lite"
 }
